@@ -23,8 +23,12 @@ Regarding 3: E.g. in a company, why would wireless need to be enabled weekends i
 Or think of an accesspoint in your kids room when you want the youngsters to sleep after 10 pm instead of facebooking...
 
 ## Configuration
-You can create an arbitrary number of schedule events. Please note that there is on sanity check done whether the start / stop times overlap or make sense.
-If start and stop time are equal, this leads to disabling the WiFi at the given time.
+WiFi remains allowed while any enabled schedule window is active. Overnight
+windows belong to their starting weekday, including Sunday-to-Monday rollover.
+Equal start and stop times define a stop-only event. Old cron jobs revalidate the
+current entry and global setting before acting; deleted or disabled entries
+cannot change radio state. The backend documents the calendar and retry rules in
+[wifischedule](../../../packages/net/wifischedule/README.md).
 
 Please note that the "Unload Modules" function is currently considered as experimental. You can manually add / remove modules in the text field.
 The button "Determine Modules Automatically" tries to make a best guess determining regarding the driver module and its dependencies.
@@ -70,9 +74,11 @@ Then call the script as follows in order to get the necessary cron jobs created:
 All commands:
 
 ```
-wifi_schedule.sh cron|start|stop|forcestop|recheck|getmodules|savemodules|help
+wifi_schedule.sh cron|cron-only|startup|start|stop|forcestop|recheck|getmodules|savemodules|help
 
-    cron: Create cronjob entries.
+    cron: Create cronjob entries and reconcile the current window.
+    cron-only: Rebuild cron jobs without changing radio state.
+    startup: Reconcile the current window when scheduling is enabled.
     start: Start wifi.
     stop: Stop wifi gracefully, i.e. check if there are stations associated and if so keep retrying.
     forcestop: Stop wifi immediately.
@@ -81,3 +87,8 @@ wifi_schedule.sh cron|start|stop|forcestop|recheck|getmodules|savemodules|help
     savemodules: Saves a list of automatic determined modules to UCI
     help: This description.
 ```
+
+Configuration changes are reconciled by the standard ucitrack service, including
+when the scheduling startup service is disabled. The browser does not retain a
+global apply listener. Read-only RPC access permits module inspection; radio
+control requires write access and one of the explicit manual commands.

@@ -115,10 +115,10 @@
 		"description": "Grant access to crontab configuration",
 		"read": {
 			"file": {
-				"/etc/crontabs/root": [ "read" ]
+				"/etc/crontabs/root": [ "list", "read" ]
 			},
 			"ubus": {
-				"file": [ "read" ]
+				"file": [ "read", "stat" ]
 			}
 		},
 		"write": {
@@ -127,7 +127,7 @@
 				"/etc/init.d/cron reload": [ "exec" ]
 			},
 			"ubus": {
-				"file": [ "write" ]
+				"file": [ "exec", "write" ]
 			}
 		}
 	},

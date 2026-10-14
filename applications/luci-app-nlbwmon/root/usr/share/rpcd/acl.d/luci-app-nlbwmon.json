@@ -25,7 +25,7 @@
 				"/usr/share/nlbwmon/protocols": [ "write" ]
 			},
 			"ubus": {
-				"file": [ "write" ]
+				"file": [ "exec", "write" ]
 			},
 			"uci": [ "nlbwmon" ]
 		}

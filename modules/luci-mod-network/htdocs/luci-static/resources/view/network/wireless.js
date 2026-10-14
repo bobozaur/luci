@@ -14,6 +14,99 @@
 
 const isReadonlyView = !L.hasViewPermission();
 
+function show_client_wps(radioNet) {
+	const section = radioNet.getName();
+	const object = 'wpa_supplicant.' + radioNet.getIfname();
+	const status = rpc.declare({ object, method: 'wps_status', params: [ 'section' ], expect: {}, reject: true });
+	const start = rpc.declare({ object, method: 'wps_start', params: [ 'section' ], reject: true });
+	const cancel = rpc.declare({ object, method: 'wps_cancel', params: [ 'section' ], reject: true });
+	const message = E('p', {}, _('Reading enrollment status…'));
+	const connection = E('p');
+	let revision = 0;
+	let busy = false;
+	let current = {};
+	let container;
+	const phases = {
+		idle: _('Ready to enroll.'),
+		active: _('WPS enrollment is active. Press the WPS button on the access point.'),
+		connecting: _('Credentials received. Connecting to the access point…'),
+		waiting: _('Connected. Waiting for pending configuration changes to be applied or discarded before saving credentials.'),
+		saved: _('Credentials saved. The client will use them after restart.'),
+		unconfirmed: _('Credential storage could not be confirmed. Check the saved wireless configuration.'),
+		conflict: _('The client configuration changed during enrollment. Credentials were not overwritten; start enrollment again after applying your changes.'),
+		cancelled: _('Enrollment cancelled or rejected by the access point.'),
+		expired: _('Enrollment expired before credentials could be saved.'),
+		'unrepresentable credential': _('This credential cannot be saved automatically. Configure the client manually.'),
+	};
+	const startButton = E('button', {
+		'class': 'btn cbi-button cbi-button-positive', 'disabled': true,
+		'click': ui.createHandlerFn(null, () => action(start)),
+	}, _('Start WPS'));
+	const cancelButton = E('button', {
+		'class': 'btn cbi-button cbi-button-negative', 'disabled': true,
+		'click': ui.createHandlerFn(null, () => action(cancel)),
+	}, _('Cancel enrollment'));
+
+	function controls() {
+		const active = [ 'active', 'connecting', 'waiting' ].includes(current.phase);
+		startButton.disabled = isReadonlyView || busy || !current.persistent || active;
+		cancelButton.disabled = isReadonlyView || busy || !current.persistent || !active;
+	}
+	function refresh() {
+		const requested = ++revision;
+		return status(section).then(result => {
+			if (requested != revision)
+				return;
+			current = result;
+			dom.content(message, result.persistent
+				? (phases[result.phase] || _('Reading enrollment status…'))
+				: _('Automatic WPS credential saving requires a complete client configuration assigned to one radio. Apply that configuration before enrollment.'));
+			dom.content(connection, result.state == 'COMPLETED'
+				? _('Client connected.') : _('Client connection is not established.'));
+			controls();
+		}).catch(error => {
+			if (requested != revision)
+				return;
+			current = {};
+			dom.content(message, _('Waiting for the client interface. Apply and enable its configuration if it is stopped.'));
+			dom.content(connection, error.message);
+			controls();
+		});
+	}
+	function action(command) {
+		if (isReadonlyView || busy || !current.persistent)
+			return Promise.resolve();
+		revision++;
+		busy = true;
+		controls();
+		return command(section).catch(error => {
+			ui.addNotification(null, E('p', error.message), 'error');
+		}).finally(() => {
+			busy = false;
+			return refresh();
+		});
+	}
+	function update() {
+		if (!container.isConnected) {
+			poll.remove(update);
+			return Promise.resolve();
+		}
+		if (busy)
+			return Promise.resolve();
+		return refresh();
+	}
+	container = E('div', {}, [
+		E('p', {}, _('Apply the client configuration before enrollment. WPS will save the credentials of the connection that succeeds.')),
+		message, connection,
+		E('div', { 'class': 'right' }, [startButton, ' ', cancelButton, ' ', E('button', {
+			'class': 'btn', 'click': () => { poll.remove(update); ui.hideModal(); },
+		}, _('Close'))]),
+	]);
+	ui.showModal(_('Client WPS enrollment'), [container]);
+	poll.add(update, 2);
+	return refresh();
+}
+
 function count_changes(section_id) {
 	const changes = ui.changes.changes?.wireless;
 	if (!Array.isArray(changes)) return 0;
@@ -986,6 +1079,12 @@ return view.extend({
 						'click': ui.createHandlerFn(this, 'handleRemove', section_id)
 					}, _('Remove'))
 				];
+				if (inst.get('mode') == 'sta' && L.hasSystemFeature('wpasupplicant', 'wps'))
+					btns.push(E('button', {
+						'class': 'cbi-button cbi-button-action',
+						'title': _('Enroll this client using WPS'),
+						'click': ui.createHandlerFn(null, show_client_wps, inst),
+					}, _('WPS')));
 			}
 
 			return E('td', { 'class': 'td middle cbi-section-actions' }, E('div', btns));
@@ -1334,6 +1433,7 @@ return view.extend({
 				o.depends('encryption', 'wpa3-192');
 				o.depends('encryption', 'psk');
 				o.depends('encryption', 'sae');
+				o.depends('encryption', 'sae-mixed');
 				o.depends('encryption', 'psk2');
 				o.depends('encryption', 'wpa-mixed');
 				o.depends('encryption', 'psk-mixed');
@@ -1365,6 +1465,9 @@ return view.extend({
 				if (hwtype == 'mac80211') {
 					const has_supplicant = L.hasSystemFeature('wpasupplicant');
 					const has_hostapd = L.hasSystemFeature('hostapd');
+					const has_sta_wps = L.hasSystemFeature('wpasupplicant', 'wps');
+					if (has_sta_wps)
+						crypto_modes.push(['wps', _('WPS enrollment'), -1]);
 
 					// Probe EAP support
 					const has_ap_eap = L.hasSystemFeature('hostapd', 'eap');
@@ -1448,6 +1551,7 @@ return view.extend({
 							'owe': has_ap_owe || _('Requires hostapd with OWE support')
 						},
 						'sta': {
+							'wps': has_sta_wps || _('Requires wpa-supplicant with WPS support'),
 							'wep-open': has_sta_wep || _('Requires wpa-supplicant with WEP support'),
 							'wep-shared': has_sta_wep || _('Requires wpa-supplicant with WEP support'),
 							'psk': has_supplicant || _('Requires wpa-supplicant'),
@@ -1514,6 +1618,10 @@ return view.extend({
 				crypto_modes.sort(function(a, b) { return b[2] - a[2]; });
 
 				crypto_modes.forEach(crypto_mode => {
+					if (crypto_mode[0] == 'wps') {
+						encr.value('wps', crypto_mode[1]);
+						return;
+					}
 					const security_level = (crypto_mode[2] >= 30) ? _('strong security')
 						: (crypto_mode[2] >= 20) ? _('medium security')
 							: (crypto_mode[2] >= 10) ? _('weak security') : _('open network');

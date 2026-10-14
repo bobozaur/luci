@@ -92,6 +92,7 @@ return view.extend({
 				throw new Error(_('Malformed data received'));
 
 			trafficData = res;
+			this.period = period || null;
 
 			const addrs = this.query(null, [ 'ip' ], null);
 			const ipAddrs = [];
@@ -791,6 +792,10 @@ return view.extend({
 	handleDownload(type, group, order) {
 		const args = [ 'download', '-f', type ];
 
+		// Export the period belonging to the accepted, displayed data.
+		if (this.period)
+			args.push('-t', this.period);
+
 		if (group)
 			args.push('-g', group);
 
@@ -813,6 +818,9 @@ return view.extend({
 	},
 
 	handleCommit() {
+		if (!L.hasViewPermission())
+			return Promise.reject(new Error(_('Write permission is required for this action.')));
+
 		return fs.exec('/usr/libexec/nlbwmon-action', [ 'commit' ]).then(function(res) {
 			if (res.code != 0)
 				throw new Error(res.stderr || res.stdout);
@@ -891,6 +899,7 @@ return view.extend({
 					E('div', { 'class': 'right' }, [
 						E('button', {
 							'class': 'cbi-button',
+							'disabled': !L.hasViewPermission() ? true : null,
 							'click': ui.createHandlerFn(this, 'handleCommit')
 							}, _('Force reload…')
 						)
@@ -937,6 +946,7 @@ return view.extend({
 					E('div', { 'class': 'right' }, [
 						E('button', {
 							'class': 'cbi-button',
+							'disabled': !L.hasViewPermission() ? true : null,
 							'click': ui.createHandlerFn(this, 'handleCommit')
 							}, _('Force reload…')
 						)
@@ -984,6 +994,7 @@ return view.extend({
 					E('div', { 'class': 'right' }, [
 						E('button', {
 							'class': 'cbi-button',
+							'disabled': !L.hasViewPermission() ? true : null,
 							'click': ui.createHandlerFn(this, 'handleCommit')
 							}, _('Force reload…')
 						)

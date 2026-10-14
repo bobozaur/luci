@@ -1,0 +1,7 @@
+{
+	"luci-app-xl2tpd": {
+		"description": "Manage L2TP servers and their PPP users",
+		"read": { "uci": [ "xl2tp" ] },
+		"write": { "uci": [ "xl2tp" ] }
+	}
+}
