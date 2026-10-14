@@ -6,6 +6,9 @@
 
 include $(TOPDIR)/rules.mk
 
+PKG_VERSION=$(PKG_SRC_VERSION)
+PKG_RELEASE:=3
+
 LUCI_TITLE:=LuCI Network Administration
 LUCI_DEPENDS:=+luci-base +rpcd-mod-iwinfo +luci-lib-uqr
 
@@ -14,4 +17,3 @@ PKG_LICENSE:=Apache-2.0
 include ../../luci.mk
 
 # call BuildPackage - OpenWrt buildroot signature
-

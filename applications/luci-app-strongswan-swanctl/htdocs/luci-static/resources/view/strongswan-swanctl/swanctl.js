@@ -354,6 +354,13 @@ return view.extend({
 		o.datatype = 'file';
 		o.modalonly = true;
 
+		o = s.taboption('advanced', form.Value, 'reqid', _('Request ID'),
+			_('Leave empty or use 0 to allocate an ID automatically. A fixed ID associates the tunnel with a specific kernel IPsec policy.'));
+		o.datatype = 'and(uinteger,range(0,4294967295))';
+		o.placeholder = '0';
+		o.optional = true;
+		o.modalonly = true;
+
 		o = s.taboption('advanced', form.ListValue, 'dpdaction', _('DPD Action'),
 			_('Action when DPD timeout occurs'));
 		o.value('none');

@@ -5,6 +5,7 @@ include $(TOPDIR)/rules.mk
 LUCI_TITLE:=LuCI usteer app for js based luci
 LUCI_DEPENDS:=+luci-base +usteer
 
+PKG_RELEASE:=2
 PKG_LICENSE:=Apache-2.0
 PKG_MAINTAINER:=Ramon Van Gorkom <Ramon00c00@gmail.com>
 

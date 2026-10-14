@@ -6,6 +6,9 @@
 
 include $(TOPDIR)/rules.mk
 
+PKG_VERSION=$(PKG_SRC_VERSION)
+PKG_RELEASE:=1
+
 LUCI_TITLE:=Support for OpenVPN
 LUCI_DEPENDS:=+openvpn
 LUCI_PKGARCH:=all

@@ -7,11 +7,15 @@
 				"/usr/sbin/swanmon stats": [ "exec" ]
 			},
 			"ubus": {
+				"file": [ "exec" ],
 				"luci.swanctl": [ "list-algs", "map-conns" ]
 			},
-			"uci": [ "ipsec" ]
+			"uci": [ "ipsec", "network" ]
 		},
 		"write": {
+			"ubus": {
+				"file": [ "exec" ]
+			},
 			"file": {
 				"/usr/sbin/swanctl --initiate --ike *": [ "exec" ],
 				"/usr/sbin/swanctl --initiate --child *": [ "exec" ],

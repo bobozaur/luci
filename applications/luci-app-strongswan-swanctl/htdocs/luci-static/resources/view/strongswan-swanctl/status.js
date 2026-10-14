@@ -56,8 +56,19 @@ function buildKeyValueTable(kvPairs) {
 }
 
 function swanctlCommand(parameters) {
+	if (!L.hasViewPermission())
+		return Promise.reject(new Error(_('Permission denied.')));
+
 	return fs.exec('/usr/sbin/swanctl', parameters)
-		.catch(e => ui.addNotification(null, E('p', e.message)));
+		.then(function(result) {
+			if (result.code !== 0)
+				throw new Error(result.stderr || result.stdout || _('strongSwan command failed.'));
+			return result;
+		})
+		.catch(e => {
+			ui.addNotification(null, E('p', e.message), 'error');
+			throw e;
+		});
 }
 
 function handleConnectionUp(connectionName) {
@@ -161,13 +172,13 @@ function renderChildTable(connection) {
 				E('button', {
 					'title': _('Start'),
 					'class': 'btn cbi-button cbi-button-positive',
-					...(isDown ? {} : { 'disabled': 'disabled' }),
+					'disabled': !L.hasViewPermission() || !isDown,
 					'click': ui.createHandlerFn(null, handleChildUp, childName)
 				}, [_('Start')]),
 				E('button', {
 					'title': _('Stop'),
 					'class': 'btn cbi-button cbi-button-negative',
-					...(isDown ? { 'disabled': 'disabled' } : {}),
+					'disabled': !L.hasViewPermission() || isDown,
 					'click': ui.createHandlerFn(null, handleChildDown, childName)
 				}, [_('Stop')])
 			]
@@ -318,13 +329,13 @@ return view.extend({
 					E('button', {
 						'title': _('Start'),
 						'class': 'btn cbi-button cbi-button-positive',
-						...(isDown ? {} : { 'disabled': 'disabled' }),
+						'disabled': !L.hasViewPermission() || !isDown,
 						'click': ui.createHandlerFn(null, handleConnectionUp, connection.name)
 					}, [_('Start')]),
 					E('button', {
 						'title': _('Stop'),
 						'class': 'btn cbi-button cbi-button-negative',
-						...(isDown ? { 'disabled': 'disabled' } : {}),
+						'disabled': !L.hasViewPermission() || isDown,
 						'click': ui.createHandlerFn(null, handleConnectionDown, connection.name)
 					}, [_('Stop')])
 				])
