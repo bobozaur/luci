@@ -7,17 +7,12 @@
 			"path": "admin/network/firewall/zones"
 		},
 		"depends": {
-			"acl": [
-				"luci-app-firewall"
-			],
-			"fs": {
-				"/sbin/fw3": "executable"
-			},
-			"uci": {
-				"firewall": true
-			}
+			"acl": [ "luci-app-firewall" ],
+			"fs": { "/sbin/fw3": "executable" },
+			"uci": { "firewall": true }
 		}
 	},
+
 	"admin/network/firewall/zones": {
 		"title": "General Settings",
 		"order": 10,
@@ -26,6 +21,7 @@
 			"path": "firewall/zones"
 		}
 	},
+
 	"admin/network/firewall/forwards": {
 		"title": "Port Forwards",
 		"order": 20,
@@ -34,6 +30,7 @@
 			"path": "firewall/forwards"
 		}
 	},
+
 	"admin/network/firewall/rules": {
 		"title": "Traffic Rules",
 		"order": 30,
@@ -42,6 +39,7 @@
 			"path": "firewall/rules"
 		}
 	},
+
 	"admin/network/firewall/snats": {
 		"title": "NAT Rules",
 		"order": 40,
@@ -50,6 +48,7 @@
 			"path": "firewall/snats"
 		}
 	},
+
 	"admin/network/firewall/ipsets": {
 		"title": "IP Sets",
 		"order": 45,
@@ -58,6 +57,7 @@
 			"path": "firewall/ipsets"
 		}
 	},
+
 	"admin/network/firewall/custom": {
 		"title": "Custom Rules",
 		"order": 50,
@@ -66,11 +66,10 @@
 			"path": "firewall/custom"
 		},
 		"depends": {
-			"fs": {
-				"/usr/share/fw3/helpers.conf": "file"
-			}
+			"fs": { "/usr/share/fw3/helpers.conf": "file" }
 		}
 	},
+
 	"admin/network/firewall/triggers": {
 		"title": "Port Triggers",
 		"order": 25,
