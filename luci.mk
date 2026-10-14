@@ -260,6 +260,7 @@ define Package/$(PKG_NAME)/postinst
 	rm -f /tmp/luci-indexcache.*
 	rm -rf /tmp/luci-modulecache/
 	/etc/init.d/rpcd reload 2>/dev/null
+	$(if $(wildcard ${CURDIR}/root/usr/share/ucitrack/*.json),/etc/init.d/ucitrack reload || exit $$?)
 	exit 0
 }
 endef
