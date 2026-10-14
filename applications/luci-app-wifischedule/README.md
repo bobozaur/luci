@@ -27,8 +27,7 @@ WiFi remains allowed while any enabled schedule window is active. Overnight
 windows belong to their starting weekday, including Sunday-to-Monday rollover.
 Equal start and stop times define a stop-only event. Old cron jobs revalidate the
 current entry and global setting before acting; deleted or disabled entries
-cannot change radio state. The backend documents the calendar and retry rules in
-[wifischedule](../../../packages/net/wifischedule/README.md).
+cannot change radio state. The wifischedule package documents the calendar and retry rules.
 
 Please note that the "Unload Modules" function is currently considered as experimental. You can manually add / remove modules in the text field.
 The button "Determine Modules Automatically" tries to make a best guess determining regarding the driver module and its dependencies.
