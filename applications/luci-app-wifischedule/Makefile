@@ -23,16 +23,6 @@ PKG_RELEASE:=5
 PKG_LICENSE:=ISC
 PKG_MAINTAINER:=Nils Koenig <openwrt@newk.it>
 
-# Rebuild the native config trigger on live upgrades as well as image boot.
-define Package/luci-app-wifischedule/postinst
-[ -n "$${IPKG_INSTROOT}" ] || {
-	rm -f /tmp/luci-indexcache.*
-	rm -rf /tmp/luci-modulecache/
-	/etc/init.d/rpcd reload 2>/dev/null
-	/etc/init.d/ucitrack reload
-}
-endef
-
 include ../../luci.mk
 
 # call BuildPackage - OpenWrt buildroot signature
