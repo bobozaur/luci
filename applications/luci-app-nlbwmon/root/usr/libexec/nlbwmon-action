@@ -16,7 +16,7 @@ case "$1" in
 
 	backup)
 		dbdir=$(uci -q get nlbwmon.@nlbwmon[0].database_directory)
-		dbdir=${dbdir:-/etc/nlbwmon}
+		dbdir=${dbdir:-/var/lib/nlbwmon}
 		if [ ! -d "$dbdir" ]; then
 			echo "Unable to locate database directory" >&2
 			exit 1
@@ -124,7 +124,7 @@ case "$1" in
 			exit 1
 		fi
 		dbdir=$(uci -q get nlbwmon.@nlbwmon[0].database_directory)
-		dbdir=${dbdir:-/etc/nlbwmon}
+		dbdir=${dbdir:-/var/lib/nlbwmon}
 		/bin/mkdir -p "$dbdir" || exit 1
 		stage=$(mktemp -d "$dbdir/.restore.XXXXXX") || exit 1
 		was_running=0
