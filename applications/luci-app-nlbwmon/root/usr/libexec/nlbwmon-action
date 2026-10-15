@@ -1,16 +1,51 @@
 #!/bin/sh
 
 case "$1" in
+	backup|commit|restore)
+		exec 9>/var/lock/nlbwmon-action.lock || exit 1
+		flock -x 9 || exit 1
+		# Share the native init owner, including its inherited FD1000 lock.
+		initscript=/etc/init.d/nlbwmon
+		. /lib/functions/procd.sh
+		procd_lock
+		flock -n 1000 || exit 1
+	;;
+esac
+
+case "$1" in
 
 	backup)
 		dbdir=$(uci -q get nlbwmon.@nlbwmon[0].database_directory)
-
-		if [ ! -d "${dbdir:-/var/lib/nlbwmon}" ]; then
+		dbdir=${dbdir:-/var/lib/nlbwmon}
+		if [ ! -d "$dbdir" ]; then
 			echo "Unable to locate database directory" >&2
 			exit 1
 		fi
-
-		exec /bin/tar -C "${dbdir:-/var/lib/nlbwmon}" -c -z . -f -
+		stage=$(mktemp -d "$dbdir/.backup.XXXXXX") || exit 1
+		cleanup_backup() {
+			status=$?
+			trap - EXIT HUP INT TERM
+			/bin/rm -rf "$stage" || status=1
+			exit "$status"
+		}
+		trap cleanup_backup EXIT
+		trap 'exit 1' HUP INT TERM
+		# The daemon publishes immutable inodes. Hardlinks give tar stable
+		# sizes and bytes while periodic commits continue under the init lock.
+		for file in "$dbdir"/*.db.gz "$dbdir"/*.db; do
+			[ -f "$file" ] && [ ! -L "$file" ] || continue
+			name=${file##*/}
+			period=${name%%.*}
+			case "$name" in
+				[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].db|\
+				[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].db.gz) ;;
+				*) continue ;;
+			esac
+			[ ! -e "$stage/$period.db.gz" ] || continue
+			/bin/ln "$file" "$stage/$name" || exit 1
+		done
+		/bin/tar -C "$stage" -c -z . -f -
+		exit $?
 	;;
 
 	commit)
@@ -88,25 +123,163 @@ case "$1" in
 			echo "Unable to locate archive to restore" >&2
 			exit 1
 		fi
-
 		dbdir=$(uci -q get nlbwmon.@nlbwmon[0].database_directory)
-		files=$(/bin/tar -tzf /tmp/nlbw-restore.tar.gz | grep -E '^(\./)?[0-9]{8}\.db(\.gz)?$' | tr '\n' ' ')
+		dbdir=${dbdir:-/var/lib/nlbwmon}
+		/bin/mkdir -p "$dbdir" || exit 1
+		stage=$(mktemp -d "$dbdir/.restore.XXXXXX") || exit 1
+		was_running=0
+		service_touched=0
+		files_touched=0
+		committed=0
+		retain_stage=0
+		files=
+		targets=
+		originals=
 
+		query_accounting() {
+			state=$(ubus call service list '{"name":"nlbwmon"}') || return 1
+			parsed_state=$(jshn -r "$state") || return 1
+			eval "$parsed_state" || return 1
+			accounting_present=0
+			accounting_running=0
+			service_type=
+			json_get_type service_type nlbwmon
+			[ -n "$service_type" ] || return 0
+			[ "$service_type" = object ] || return 1
+			accounting_present=1
+			json_select nlbwmon || return 1
+			instances_type=
+			json_get_type instances_type instances
+			[ -n "$instances_type" ] || return 0
+			[ "$instances_type" = object ] || return 1
+			json_select instances || return 1
+			json_get_keys instances
+			for instance in $instances; do
+				json_select "$instance" || return 1
+				json_get_var active running
+				[ "$active" != 1 ] || accounting_running=1
+				json_select .. || return 1
+			done
+			return 0
+		}
+		# Procd retains terminating instances until reap, and delete disables
+		# respawn. The native init lock plus successful service absence gives
+		# an idempotent drain acknowledgement, including pre-stop replacement.
+		stop_accounting() {
+			query_accounting || return 1
+			[ "$accounting_present" = 1 ] || return 0
+			/etc/init.d/nlbwmon stop
+			stop_result=$?
+			for attempt in 1 2 3 4 5 6 7 8; do
+				query_accounting || return 1
+				[ "$accounting_present" = 1 ] || return 0
+				[ "$stop_result" = 0 ] || return 1
+				sleep 1
+			done
+			echo "Accounting process did not stop" >&2
+			return 1
+		}
+		start_accounting() {
+			/etc/init.d/nlbwmon start || return 1
+			for attempt in 1 2 3 4 5 6 7 8; do
+				/etc/init.d/nlbwmon running && /usr/sbin/nlbw -c list >/dev/null && return 0
+				sleep 1
+			done
+			echo "Accounting process did not become ready" >&2
+			return 1
+		}
+		cleanup_restore() {
+			status=$?
+			trap - EXIT HUP INT TERM
+			if [ "$committed" = 0 ]; then
+				# A signal can arrive during startup, after it published a new
+				# daemon. Retire that writer before touching its database files.
+				if [ "$service_touched" = 1 ] && ! stop_accounting; then
+					status=1
+					retain_stage=1
+				fi
+				if [ "$retain_stage" = 0 ] && [ "$files_touched" = 1 ]; then
+					for name in $targets; do
+						if [ -f "$stage/old/$name" ]; then
+							/bin/mv -f "$stage/old/$name" "$dbdir/$name" || { status=1; retain_stage=1; }
+						else
+							case " $originals " in
+								*" $name "*) ;; # Original move did not happen.
+								*) /bin/rm -f "$dbdir/$name" || { status=1; retain_stage=1; } ;;
+							esac
+						fi
+					done
+				fi
+				if [ "$retain_stage" = 0 ] && [ "$was_running" = 1 ] && [ "$service_touched" = 1 ]; then
+					start_accounting || status=1
+				fi
+			fi
+			if [ "$retain_stage" = 0 ]; then
+				/bin/rm -rf "$stage" || status=1
+			else
+				echo "Prior database files retained at $stage/old" >&2
+			fi
+			exit "$status"
+		}
+		trap cleanup_restore EXIT
+		trap 'exit 1' HUP INT TERM
+
+		# CGI upload owns its shared path independently. Work only from our
+		# private copy, and never unlink an archive a later upload may replace.
+		/bin/cp /tmp/nlbw-restore.tar.gz "$stage/archive.tar.gz" || exit 1
+		listing=$(/bin/tar -tvzf "$stage/archive.tar.gz") || exit 1
+		# Compressed and plain encodings name the same period. Reject both
+		# ambiguous duplicates and links before any entry reaches tar -x.
+		files=$(printf '%s\n' "$listing" | awk '
+			$6 ~ /^(\.\/)?[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]\.db(\.gz)?$/ {
+				name = $6; sub(/^\.\//, "", name)
+				period = substr(name, 1, 8)
+				if (substr($1, 1, 1) != "-" || seen[period]++) bad = 1
+				print $6
+			}
+			END { if (bad) exit 1 }
+		') || { echo "Invalid database archive entries" >&2; exit 1; }
 		if [ -z "$files" ]; then
 			echo "Invalid or empty backup archive" >&2
 			exit 1
 		fi
-
-		/etc/init.d/nlbwmon stop
-		/bin/mkdir -p "${dbdir:-/var/lib/nlbwmon}"
-
-		for file in $(/bin/tar -C "${dbdir:-/var/lib/nlbwmon}" -vxzf /tmp/nlbw-restore.tar.gz $files); do
-			res="${res:+$res, }\"${file#./}\""
+		/bin/mkdir "$stage/new" "$stage/old" || exit 1
+		/bin/tar -C "$stage/new" -xzf "$stage/archive.tar.gz" $files || exit 1
+		for file in $files; do
+			name=${file#./}
+			[ -f "$stage/new/$name" ] && [ ! -L "$stage/new/$name" ] || exit 1
+			period=${name%%.*}
+			targets="$targets $period.db $period.db.gz"
 		done
 
-		/bin/rm -f /tmp/nlbw-restore.tar.gz
-		/etc/init.d/nlbwmon start
-
+		query_accounting || exit 1
+		if [ "$accounting_running" = 1 ]; then
+			was_running=1
+			# Record intent before stop: cleanup also covers interruption inside it.
+			service_touched=1
+			stop_accounting || exit 1
+		fi
+		for name in $targets; do
+			if [ -e "$dbdir/$name" ] || [ -L "$dbdir/$name" ]; then
+				[ -f "$dbdir/$name" ] && [ ! -L "$dbdir/$name" ] || exit 1
+				originals="$originals $name"
+			fi
+		done
+		# Record the whole original set before any rename; filesystem locations
+		# then identify completed moves even if a signal interrupts the loop.
+		files_touched=1
+		for name in $originals; do
+			/bin/mv "$dbdir/$name" "$stage/old/$name" || exit 1
+		done
+		for file in $files; do
+			name=${file#./}
+			/bin/mv "$stage/new/$name" "$dbdir/$name" || exit 1
+			res="${res:+$res, }\"$name\""
+		done
+		if [ "$was_running" = 1 ]; then
+			start_accounting || exit 1
+		fi
+		committed=1
 		printf '{ "restored": [ %s ] }' "$res"
 	;;
 

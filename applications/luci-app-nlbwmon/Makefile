@@ -1,5 +1,8 @@
 include $(TOPDIR)/rules.mk
 
+PKG_VERSION=$(PKG_SRC_VERSION)
+PKG_RELEASE:=2
+
 PKG_LICENSE:=Apache-2.0
 
 LUCI_TITLE:=Netlink based bandwidth accounting
