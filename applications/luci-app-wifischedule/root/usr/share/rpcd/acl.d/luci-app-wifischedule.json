@@ -2,15 +2,48 @@
 	"luci-app-wifischedule": {
 		"description": "Grant UCI access for luci-app-wifischedule",
 		"read": {
-			"uci": [ "wifi_schedule" ],
+			"uci": [
+				"wifi_schedule"
+			],
 			"file": {
-				"/usr/bin/iwinfo": [ "stat" ],
-				"/usr/bin/wifi_schedule.sh": ["exec"],
-				"/sbin/wifi": ["stat"]
-			}
+				"/usr/bin/iwinfo": [
+					"list"
+				],
+				"/usr/bin/wifi_schedule.sh": [
+					"list"
+				],
+				"/usr/bin/wifi_schedule.sh getmodules": [
+					"exec"
+				],
+				"/sbin/wifi": [
+					"list"
+				]
+			},
+			"ubus": {
+				"file": [
+					"stat",
+					"exec"
+				]
+			},
+			"cgi-io": [
+				"exec"
+			]
 		},
 		"write": {
-			"uci": [ "wifi_schedule" ]
+			"uci": [
+				"wifi_schedule"
+			],
+			"file": {
+				"/usr/bin/wifi_schedule.sh start manual": [
+					"exec"
+				],
+				"/usr/bin/wifi_schedule.sh stop manual": [
+					"exec"
+				],
+				"/usr/bin/wifi_schedule.sh forcestop manual": [
+					"exec"
+				]
+			}
 		}
 	}
 }
