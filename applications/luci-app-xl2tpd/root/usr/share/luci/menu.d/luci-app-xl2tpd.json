@@ -1,0 +1,8 @@
+{
+	"admin/vpn/xl2tpd": {
+		"title": "L2TP Servers",
+		"order": 80,
+		"action": { "type": "view", "path": "xl2tpd/servers" },
+		"depends": { "acl": [ "luci-app-xl2tpd" ] }
+	}
+}
