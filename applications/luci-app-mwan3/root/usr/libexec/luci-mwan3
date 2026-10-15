@@ -9,6 +9,7 @@
 . /lib/functions.sh
 . /lib/functions/network.sh
 . /usr/share/libubox/jshn.sh
+. /lib/mwan3/mwan3.sh
 
 IIF=1000
 FWMARK=2000
@@ -45,8 +46,16 @@ diag_gateway() {
 
 	local gw
 
-	network_get_gateway gw "${iface}"
-	[ -z "$gw" ] && network_get_gateway gw "${iface}_4"
+	local family
+	config_load mwan3
+	config_get family "$iface" family ipv4
+	if [ "$family" = ipv6 ]; then
+		network_get_gateway6 gw "$iface"
+		[ -n "$gw" ] || network_get_gateway6 gw "${iface}_6"
+	else
+		network_get_gateway gw "$iface"
+		[ -n "$gw" ] || network_get_gateway gw "${iface}_4"
+	fi
 
 	[ -z "$gw" ] && {
 		echo "No gateway for interface ${iface} found."
@@ -70,81 +79,37 @@ diag_tracking() {
 	config_list_foreach "$iface" "track_ip" checkips "$iface"
 }
 
-iface_number() {
-	local cfg="$1"
-	local iface="$2"
-
-	let number++
-
-	[ "$cfg" = "$iface" ] && {
-		ID="$number"
-	}
+diag_interface() {
+	local family
+	config_load mwan3
+	mwan3_get_iface_id ID "$1"
+	config_get family "$1" family ipv4
+	case "$ID" in ''|*[!0-9]*) echo "Unknown mwan3 interface $1"; return 2 ;; esac
+	[ "$family" = ipv6 ] && IP="$IP6" || IP="$IP4"
 }
 
 diag_rules() {
-	local iface="$1"
-
-	local number=0
-	local iif=0
-	local fwmark=0
-
-	local iif_rule iif_result
-	local fwmark_rule fwmark_result
-
-	config_load mwan3
-	config_foreach iface_number 'interface' "$iface"
-
-	[ "$ID" = "0" ] && {
-		echo "Unable to get mwan3 interface number for \"$iface\"."
-		exit 2
-	}
-
-	let "iif=$IIF+$ID"
-	let "fwmark=$FWMARK+$ID"
-
-	iif_rule="$(ip rule | grep ${iif})"
-	iif_result="$?"
-
-	fwmark_rule="$(ip rule | grep ${fwmark})"
-	fwmark_result="$?"
-
-	if [ "$fwmark_result" = 0 ] && [ "$iif_result" = 0 ]; then
-		echo "All required IP rules for interface \"$iface\" found"
-		echo "$fwmark_rule"
-		echo "$iif_rule"
-	elif [ "$fwmark_result" = 1 ] && [ "$iif_result" = 0 ]; then
-		echo "Only iif IP rule for interface \"$iface\" found"
-		echo "$iif_rule"
-	elif [ "$fwmark_result" = 0 ] && [ "$iif_result" = 1 ]; then
-		echo "Only fwmark IP rule for interface \"$iface\" found"
-		echo "$fwmark_rule"
-	else
-		echo "Missing fwmark and iif IP rule for interface \"$iface\""
-	fi
+	local iface="$1" rules pref found=1
+	diag_interface "$iface" || return
+	for pref in $((1000+ID)) $((2000+ID)) $((3000+ID)); do
+		rules=$($IP rule list pref "$pref") || return
+		rules=$(printf '%s\n' "$rules" | sed -n '/ proto\(col\)\? '"$MWAN3_ROUTE_PROTOCOL"'\( \|$\)/p')
+		if [ -n "$rules" ]; then
+			printf '%s\n' "$rules"
+		else
+			echo "Missing owned rule $pref for $iface"
+			found=0
+		fi
+	done
+	[ "$found" = 1 ]
 }
 
 diag_routes() {
-	local iface="$1"
-
-	local table table_result
-
-	config_load mwan3
-	config_foreach iface_number 'interface' "$iface"
-
-	[ "$ID" = "0" ] && {
-		echo "Unable to get mwan3 interface number for \"$iface\"."
-		exit 2
-	}
-
-	table="$(ip route list table $ID)"
-	table_result="$?"
-
-	if [ "$table_result" = 0 ]; then
-		echo "Routing table \"$ID\" for interface \"$iface\" found"
-		echo "$table"
-	else
-		echo "Routing table \"$ID\" for interface \"$iface\" not found"
-	fi
+	local iface="$1" routes
+	diag_interface "$iface" || return
+	routes=$($IP route list table "$ID" proto "$MWAN3_ROUTE_PROTOCOL") || return
+	[ -n "$routes" ] || { echo "No owned routes for $iface"; return 1; }
+	printf '%s\n' "$routes"
 }
 
 diag_cmd() {
