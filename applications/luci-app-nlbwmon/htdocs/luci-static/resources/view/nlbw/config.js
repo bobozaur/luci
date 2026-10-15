@@ -149,7 +149,7 @@ return view.extend({
 		o.depends({ 'database_limit': '0', '!reverse': 'true' });
 
 		o = s.taboption('advanced', form.Flag, 'database_compress', _('Compress database'),
-			_('Whether to gzip compress archive databases. Compressing the database files makes accessing old data slightly slower but helps to reduce storage requirements.'));
+			_('Whether to gzip compress newly created archive periods. Existing periods keep their encoding. Compression makes accessing old data slightly slower but reduces storage requirements.'));
 		o.default = o.enabled;
 
 		o = s.taboption('advanced', form.Value, 'database_generations', _('Stored periods'),
