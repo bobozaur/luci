@@ -7,7 +7,8 @@
 var callReboot = rpc.declare({
 	object: 'system',
 	method: 'reboot',
-	expect: { result: 0 }
+	expect: { result: 0 },
+	reject: true
 });
 
 return view.extend({
@@ -30,6 +31,7 @@ return view.extend({
 		body.appendChild(E('hr'));
 		body.appendChild(E('button', {
 			'class': 'cbi-button cbi-button-action important',
+			'disabled': !L.hasViewPermission(),
 			'click': ui.createHandlerFn(this, 'handleReboot')
 		}, _('Perform reboot')));
 
@@ -37,6 +39,9 @@ return view.extend({
 	},
 
 	handleReboot: function(ev) {
+		if (!L.hasViewPermission())
+			return Promise.reject(new Error(_('Permission denied.')));
+
 		return callReboot().then(function(res) {
 			if (res != 0) {
 				L.ui.addNotification(null, E('p', _('The reboot command failed with code %d').format(res)));
