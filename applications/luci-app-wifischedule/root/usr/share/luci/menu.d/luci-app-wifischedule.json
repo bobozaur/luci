@@ -1,9 +1,14 @@
 {
-  "admin/services/wifischedule": {
-    "title": "WiFi Schedule",
-    "action": {
-      "type": "view",
-      "path": "wifischedule/wifischedule"
-    }
-  }
+	"admin/services/wifischedule": {
+		"title": "WiFi Schedule",
+		"action": {
+			"type": "view",
+			"path": "wifischedule/wifischedule"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-wifischedule"
+			]
+		}
+	}
 }
