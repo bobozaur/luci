@@ -653,6 +653,13 @@ return view.extend({
 		o.datatype = 'file';
 		o.modalonly = true;
 
+		o = s.taboption('advanced', form.Value, 'reqid', _('Request ID'),
+			_('Leave empty or use 0 to allocate an ID automatically. A fixed ID associates the child with a specific kernel IPsec policy.'));
+		o.datatype = 'and(uinteger,range(0,4294967295))';
+		o.placeholder = '0';
+		o.optional = true;
+		o.modalonly = true;
+
 		o = s.taboption('advanced', form.ListValue, 'dpd_action', _('DPD Action'),
 			swanctlDescr(_('Action when DPD timeout occurs'), 'connections.<conn>.children.<child>.dpd_action'));
 		o.value('', '%s (%s)'.format('clear', _('default')));
