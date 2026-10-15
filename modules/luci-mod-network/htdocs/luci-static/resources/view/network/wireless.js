@@ -1334,6 +1334,7 @@ return view.extend({
 				o.depends('encryption', 'wpa3-192');
 				o.depends('encryption', 'psk');
 				o.depends('encryption', 'sae');
+				o.depends('encryption', 'sae-mixed');
 				o.depends('encryption', 'psk2');
 				o.depends('encryption', 'wpa-mixed');
 				o.depends('encryption', 'psk-mixed');
