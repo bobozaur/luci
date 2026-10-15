@@ -1,0 +1,4 @@
+{
+	"config": "xl2tp",
+	"exec": "/sbin/service xl2tpd reload"
+}
