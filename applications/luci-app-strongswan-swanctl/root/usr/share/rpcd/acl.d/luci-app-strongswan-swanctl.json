@@ -22,11 +22,15 @@
 				"/usr/sbin/swanmon stats": [ "exec" ]
 			},
 			"ubus": {
-				"luci.swanctl": [ "list-algs", "map-conns" ]
+				"luci.swanctl": [ "list-algs", "map-conns" ],
+				"file": [ "exec" ]
 			},
-			"uci": [ "ipsec" ]
+			"uci": [ "ipsec", "network" ]
 		},
 		"write": {
+			"ubus": {
+				"file": [ "exec" ]
+			},
 			"cgi-io": [ "upload" ],
 			"file": {
 				"/etc/init.d/swanctl migrate *": [ "exec" ],
