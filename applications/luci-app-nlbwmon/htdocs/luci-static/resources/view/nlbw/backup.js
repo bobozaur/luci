@@ -9,6 +9,9 @@ return view.extend({
 	},
 
 	handleArchiveUpload: function(ev) {
+		if (!L.hasViewPermission())
+			return Promise.reject(new Error(_('Write permission is required for this action.')));
+
 		return ui.uploadFile('/tmp/nlbw-restore.tar.gz').then(function() {
 			return fs.exec('/usr/libexec/nlbwmon-action', [ 'restore' ]).then(function(res) {
 				if (res.code != 0)
@@ -53,6 +56,7 @@ return view.extend({
 			E('p', [
 				E('button', {
 					'class': 'cbi-button',
+					'disabled': !L.hasViewPermission() ? true : null,
 					'click': ui.createHandlerFn(this, 'handleArchiveUpload')
 				}, [ _('Restore') ])
 			]),
