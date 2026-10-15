@@ -2,101 +2,144 @@
 
 'use strict';
 
-import { stdin, access, chmod, dirname, basename, open, popen, glob, lsdir, readfile, readlink, error, mkdir } from 'fs';
-import { cursor } from 'uci';
-import { connect } from 'ubus';
-
+import { chmod, open, popen, lsdir, readfile, error, mkdir, lstat, realpath, unlink } from 'fs';
 
 const openvpn_dir = '/etc/openvpn';
+const key_types = [ 'secret', 'tls-crypt', 'tls-auth', 'auth-token',
+	'tls-crypt-v2-server', 'tls-crypt-v2-client' ];
 
 function shellquote(s) {
 	return `'${replace(s, "'", "'\\''")}'`;
 }
 
-function command(cmd) {
-	return trim(popen(cmd)?.read?.('all'));
+function checkInterface(ifname) {
+	if (type(ifname) != 'string' || !match(ifname, /^[A-Za-z0-9_]+$/))
+		die('Invalid interface name');
 }
 
-function makedirs(path) {
-	const parts = split(path, '/');
-	const grow = [];
-	for(let i = 0; i < length(parts); i++) {
-		push(grow, parts[i]);
-		mkdir(join('/', grow));
+function checkBasename(name) {
+	return type(name) == 'string' && name != '.' && name != '..' &&
+		match(name, /^[A-Za-z0-9_.-]+$/);
+}
+
+// Walk directory entries to distinguish a missing first-use directory from
+// an inspection error. Managed files never follow directory symlinks.
+function profileDir(ifname, keytype, create) {
+	checkInterface(ifname);
+	const parts = [ 'openvpn', ifname ];
+	if (keytype)
+		push(parts, keytype);
+	let path = '/etc';
+	for (let part in parts) {
+		const entries = lsdir(path);
+		if (entries == null)
+			die('Unable to inspect OpenVPN directory: %s', error());
+		const next = `${path}/${part}`;
+		if (index(entries, part) < 0) {
+			if (!create)
+				return null;
+			if (!mkdir(next, 0o700))
+				die('Unable to create OpenVPN directory: %s', error());
+		}
+		if (lstat(next)?.type != 'directory' || realpath(next) != next)
+			die('OpenVPN directories must be real directories under /etc/openvpn');
+		path = next;
 	}
-	return join('/', grow);
+	return path;
 }
 
-function keyDir(ifname, kt) {
-	return `${openvpn_dir}/${ifname}/${kt}`;
+function serverKeys(ifname) {
+	const path = profileDir(ifname, 'tls-crypt-v2-server', false);
+	if (!path)
+		return { skeys: [], path: `${openvpn_dir}/${ifname}/tls-crypt-v2-server` };
+	const entries = lsdir(path);
+	if (entries == null)
+		die('Unable to list OpenVPN server keys: %s', error());
+	return { path, skeys: filter(entries, name => checkBasename(name) &&
+		lstat(`${path}/${name}`)?.type == 'file') };
 }
 
 const methods = {
+	prepareProfile: {
+		args: { ifname: '' },
+		call: function(req) {
+			try {
+				return { path: profileDir(req.args.ifname, null, true) };
+			}
+			catch (e) {
+				return { error: e.message };
+			}
+		}
+	},
+
 	generateKey: {
 		args: { keytype: 'keytype', ifname: 'ifname', server_key: 'server_key', cl_meta: 'c_metadata' },
 		call: function(req) {
 			const kt = req.args?.keytype;
-			const ifname = req.args?.ifname || 'unnamed';
-			const ts = time();
-
-			if (!kt) return { error: 'missing keytype' };
-
-			let dir;
-			let outfile = `${ifname}_${kt}_${ts}.key`;
-
-			let mkpath = makedirs(`${keyDir(ifname, kt)}`);
-			let path = `${mkpath}/${outfile}`;
-
-			// find openvpn binary
-			const openvpn = trim(popen('command -v openvpn 2>/dev/null')?.read?.('all'));
-			if (!length(openvpn)) return { error: 'openvpn binary not found' };
-
-			let cmd;
-			if (kt == 'tls-crypt-v2-client') {
-				// client generation needs server key
-				let server_key = req.args?.server_key;
-				if (!server_key) {
-					// try to pick latest server key for same interface
-					const serverDir = `${keyDir(ifname, 'tls-crypt-v2-server')}`;
-					const list = lsdir(serverDir);
-					if (length(list) > 0) server_key = serverDir + '/' + list[-1];
-				} else {
-					server_key = `${keyDir(ifname, 'tls-crypt-v2-server')}/${req.args?.server_key}`;
+			const ifname = req.args?.ifname;
+			let path;
+			let owned = false;
+			try {
+				checkInterface(ifname);
+				if (index(key_types, kt) < 0)
+					die('Invalid key type');
+				const args = [ '/usr/sbin/openvpn' ];
+				if (kt == 'tls-crypt-v2-client') {
+					if (type(req.args.cl_meta) != 'string' ||
+						length(req.args.cl_meta) % 4 ||
+						!match(req.args.cl_meta, /^[A-Za-z0-9+\/]*={0,2}$/))
+						die('Invalid base64 client metadata');
+					const keys = serverKeys(ifname);
+					const name = req.args.server_key || keys.skeys[-1];
+					if (!checkBasename(name) || index(keys.skeys, name) < 0)
+						die('Select an existing server key for this interface');
+					push(args, '--tls-crypt-v2', `${keys.path}/${name}`);
 				}
-
-				if (!server_key) return { error: 'missing server_key for tls-crypt-v2-client' };
-
-				// denote which server key this client key is derived from in the name
-				path = `${mkpath}/${ifname}_${kt}_${ts}-${req.args?.server_key}`;
-				cmd = `${openvpn} --tls-crypt-v2 ${shellquote(server_key)} --genkey tls-crypt-v2-client ${shellquote(path)} ${shellquote(req.args?.cl_meta)} 2>/dev/null`;
-			} else {
-				// basic genkey
-				cmd = `${openvpn} --genkey ${kt} ${shellquote(path)} 2>/dev/null`;
+				const dir = profileDir(ifname, kt, true);
+				const filename = `${ifname}_${kt}_${time()}.key`;
+				path = `${dir}/${filename}`;
+				// Refuse an existing name, including symlinks, rather than
+				// replacing a credential generated by an earlier request.
+				const file = open(path, 'wx', 0o600);
+				if (!file)
+					die('Unable to create key file; retry if a key was just generated');
+				owned = true;
+				if (!file.close())
+					die('Unable to close key file');
+				push(args, '--genkey', kt, path);
+				if (kt == 'tls-crypt-v2-client')
+					push(args, req.args.cl_meta);
+				const proc = popen(join(' ', map(args, shellquote)) + ' 2>&1');
+				if (!proc)
+					die('Unable to start OpenVPN key generation');
+				const output = proc.read('all');
+				const status = proc.close();
+				if (status == null || status != 0)
+					die('OpenVPN key generation failed: %s', output);
+				if (!chmod(path, 0o600))
+					die('Unable to restrict key permissions');
+				const content = readfile(path);
+				if (!length(content))
+					die('OpenVPN did not generate a readable key');
+				return { path, filename, content };
 			}
-
-			const out = popen(cmd)?.read?.('all') || '';
-
-			// ensure permissions
-			chmod(path, 0o600);
-
-			let content = '';
-			try { content = readfile(path); } catch (e) { /* ignore */ }
-
-			if (!length(content)) {
-				return { error: 'failed to generate key', cmd_output: out };
+			catch (e) {
+				if (owned && !unlink(path))
+					return { error: `${e.message}; unable to remove incomplete key file ${path}` };
+				return { error: e.message };
 			}
-
-			return { path, filename: outfile, content };
 		}
 	},
 
 	getSKeys: {
 		args: { ifname: 'ifname' },
 		call: function(req) {
-			const serverDir = `${keyDir(req.args?.ifname, 'tls-crypt-v2-server')}`;
-			const list = lsdir(serverDir);
-
-			return { skeys: list, path: serverDir };
+			try {
+				return serverKeys(req.args.ifname);
+			}
+			catch (e) {
+				return { error: e.message };
+			}
 		}
 	}
 };
