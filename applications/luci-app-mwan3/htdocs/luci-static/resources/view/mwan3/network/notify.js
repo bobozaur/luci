@@ -7,10 +7,20 @@ const isReadonlyView = !L.hasViewPermission() || null;
 
 return view.extend({
 	load() {
-		return L.resolveDefault(fs.read('/etc/mwan3.user'), '');
+		return fs.read('/etc/mwan3.user').catch(function(error) {
+			if (error.name === 'NoDataError')
+				return fs.stat('/etc/mwan3.user').then(function(stat) {
+					if (stat.type === 'file' && stat.size === 0)
+						return '';
+					throw error;
+				});
+			throw error;
+		});
 	},
 
 	handleSave(ev) {
+		if (isReadonlyView)
+			return Promise.reject(new Error(_('Write permission is required.')));
 		const value = (document.querySelector('textarea').value || '').trim().replace(/\r\n/g, '\n') + '\n';
 
 		return fs.write('/etc/mwan3.user', value).then(function(rc) {
