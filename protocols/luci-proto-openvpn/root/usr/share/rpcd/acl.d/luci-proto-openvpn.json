@@ -3,24 +3,23 @@
 		"description": "Grant access to LuCI openvpn procedures",
 		"read": {
 			"file": {
-				"/bin/mkdir -p /etc/openvpn/*": [ "exec" ],
-				"/etc/openvpn/*": [ "read" ]
+				"/etc/openvpn": [ "list" ],
+				"/etc/openvpn/*": [ "list", "read" ]
 			},
 			"ubus": {
-				"luci.openvpn": [
-					"*"
-				]
+				"file": [ "list", "read", "stat" ],
+				"luci.openvpn": [ "getSKeys" ]
 			},
 			"uci": [ "network" ]
 		},
 		"write": {
+			"cgi-io": [ "upload" ],
 			"file": {
-				"/etc/openvpn/*": [ "write", "remove" ]
+				"/etc/openvpn/*": [ "write" ]
 			},
 			"ubus": {
-				"luci.openvpn": [
-					"*"
-				]
+				"file": [ "remove", "write" ],
+				"luci.openvpn": [ "generateKey", "prepareProfile" ]
 			},
 			"uci": [ "network" ]
 		}
