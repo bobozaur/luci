@@ -249,6 +249,7 @@ case "$1" in
 			name=${file#./}
 			[ -f "$stage/new/$name" ] && [ ! -L "$stage/new/$name" ] || exit 1
 			period=${name%%.*}
+			/usr/sbin/nlbwmon -o "$stage/new" -V "$period" || exit 1
 			targets="$targets $period.db $period.db.gz"
 		done
 
