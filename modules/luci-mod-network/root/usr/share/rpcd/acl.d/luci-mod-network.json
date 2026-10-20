@@ -5,6 +5,7 @@
 			"cgi-io": [ "exec" ],
 			"file": {
 				"/etc/iproute2/rt_tables": [ "read" ],
+				"/proc/sys/kernel/hostname": [ "read" ],
 				"/proc/sys/net/ipv6/conf/*/mtu": [ "read" ],
 				"/proc/sys/net/ipv6/conf/*/hop_limit": [ "read" ],
 				"/usr/libexec/luci-peeraddr": [ "exec" ],
@@ -12,10 +13,11 @@
 				"/sys/class/net/*/brport/*": [ "read" ]
 			},
 			"ubus": {
-				"file": [ "exec" ],
+				"file": [ "exec", "read" ],
 				"iwinfo": [ "assoclist", "countrylist", "freqlist", "txpowerlist" ],
 				"luci": [ "getSwconfigFeatures", "getSwconfigPortState" ],
-				"network.device": [ "status" ]
+				"network.device": [ "status" ],
+				"wpa_supplicant.*": [ "wps_status" ]
 			},
 			"uci": [ "dhcp", "firewall", "luci", "network", "wireless", "system" ]
 		},
@@ -29,6 +31,7 @@
 			"ubus": {
 				"file": [ "exec" ],
 				"hostapd.*": [ "del_client" ],
+				"wpa_supplicant.*": [ "wps_start", "wps_cancel" ],
 				"iwinfo": [ "scan" ]
 			},
 			"uci": [ "dhcp", "firewall", "luci", "network", "wireless" ]
