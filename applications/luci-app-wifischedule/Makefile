@@ -14,8 +14,11 @@
 
 include $(TOPDIR)/rules.mk
 
+PKG_VERSION=$(PKG_SRC_VERSION)
+
 LUCI_TITLE:=Turns WiFi on and off according to a schedule
 LUCI_DEPENDS:=+luci-base +wifischedule
+PKG_RELEASE:=2
 
 PKG_LICENSE:=ISC
 PKG_MAINTAINER:=Nils Koenig <openwrt@newk.it>
