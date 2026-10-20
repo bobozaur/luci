@@ -19,6 +19,19 @@
 'require form';
 'require fs';
 'require uci';
+'require ui';
+
+function runManualAction(action) {
+	if (!L.hasViewPermission())
+		return Promise.reject(new Error(_('Permission denied.')));
+
+	return fs.exec('/usr/bin/wifi_schedule.sh', [ action, 'manual' ]).then(function(result) {
+		if (result.code !== 0)
+			throw new Error(result.stderr || result.stdout || _('Wi-Fi control failed.'));
+	}).catch(function(error) {
+		ui.addNotification(null, E('p', error.message), 'error');
+	});
+}
 
 function timeValidator(value, desc) {
 	if (value !== null) {
@@ -56,19 +69,16 @@ return view.extend({
 		s.anonymous = true;
 
 		o = s.option(form.Button, '', _('Activate wifi'));
-		o.onclick = function (section, value) {
-			fs.exec('/usr/bin/wifi_schedule.sh', ['start', 'manual']);
-		}
+		o.readonly = !L.hasViewPermission();
+		o.onclick = function() { return runManualAction('start'); };
 
 		o = s.option(form.Button, '', _('Disable wifi gracefully'));
-		o.onclick = function (section, value) {
-			fs.exec('/usr/bin/wifi_schedule.sh', ['stop', 'manual']);
-		}
+		o.readonly = !L.hasViewPermission();
+		o.onclick = function() { return runManualAction('stop'); };
 
 		o = s.option(form.Button, '', _('Disable wifi forced'));
-		o.onclick = function (section, value) {
-			fs.exec('/usr/bin/wifi_schedule.sh', ['forcestop', 'manual']);
-		}
+		o.readonly = !L.hasViewPermission();
+		o.onclick = function() { return runManualAction('forcestop'); };
 
 		s = m.section(form.TypedSection, 'global', _('Global Settings'));
 		s.optional = false;
@@ -163,13 +173,5 @@ return view.extend({
 		};
 
 		return m.render()
-	},
-	handleSaveApply: function (ev, mode) {
-		var Fn = L.bind(function() {
-			fs.exec('/usr/bin/wifi_schedule.sh', ['cron']);
-			document.removeEventListener('uci-applied',Fn);
-		});
-		document.addEventListener('uci-applied', Fn);
-		this.super('handleSaveApply', [ev, mode]);
 	},
 });
