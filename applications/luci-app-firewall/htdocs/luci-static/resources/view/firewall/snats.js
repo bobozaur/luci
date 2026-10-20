@@ -103,12 +103,13 @@ function validate_opt_family(m, section_id, opt) {
 	const rwopt = m.section.getOption('snat_ip');
 	const fmopt = m.section.getOption('family');
 	const tgopt = m.section.getOption('target');
+	const tg = tgopt.formvalue(section_id);
 
 	if (!sopt.isValid(section_id) && opt != 'src_ip')
 		return true;
 	if (!dopt.isValid(section_id) && opt != 'dest_ip')
 		return true;
-	if (!rwopt.isValid(section_id) && opt != 'snat_ip')
+	if (tg == 'SNAT' && !rwopt.isValid(section_id) && opt != 'snat_ip')
 		return true;
 	if (!fmopt.isValid(section_id) && opt != 'family')
 		return true;
@@ -117,9 +118,8 @@ function validate_opt_family(m, section_id, opt) {
 
 	const sip = sopt.formvalue(section_id) || '';
 	const dip = dopt.formvalue(section_id) || '';
-	const rwip = rwopt.formvalue(section_id) || '';
+	const rwip = (tg == 'SNAT' ? rwopt.formvalue(section_id) : '') || '';
 	const fm = fmopt.formvalue(section_id) || '';
-	const tg = tgopt.formvalue(section_id);
 
 	if (fm == 'ipv6' && (sip.indexOf(':') != -1 || sip == '') && (dip.indexOf(':') != -1 || dip == '') && ((rwip.indexOf(':') != -1 && tg == 'SNAT') || rwip == ''))
 		return true;
