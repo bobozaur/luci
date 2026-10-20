@@ -286,6 +286,8 @@ return view.extend({
 		o = s.taboption('general', form.ListValue, 'target', _('Action'));
 		o.modalonly = true;
 		o.default = 'SNAT';
+		// An omitted target means MASQUERADE to the firewall backend.
+		o.rmempty = false;
 		o.value('SNAT', _('SNAT - Rewrite to specific source IP or port'));
 		o.value('MASQUERADE', _('MASQUERADE - Automatically rewrite to outbound interface IP'));
 		o.value('ACCEPT', _('ACCEPT - Disable address rewriting'));
@@ -313,8 +315,8 @@ return view.extend({
 		o.rmempty = true;
 		o.placeholder = _('do not rewrite');
 		o.datatype = 'portrange';
-		o.depends({ proto: 'tcp', '!contains': true });
-		o.depends({ proto: 'udp', '!contains': true });
+		o.depends({ target: 'SNAT', proto: 'tcp', '!contains': true });
+		o.depends({ target: 'SNAT', proto: 'udp', '!contains': true });
 
 		if (!fw4) {
 			o = s.taboption('advanced', form.Value, 'ipset', _('Use ipset'));
