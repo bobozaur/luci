@@ -6,6 +6,9 @@
 
 include $(TOPDIR)/rules.mk
 
+PKG_VERSION=$(PKG_SRC_VERSION)
+PKG_RELEASE:=2
+
 LUCI_TITLE:=LuCI Administration - Global System Settings
 LUCI_DEPENDS:=+luci-base
 
