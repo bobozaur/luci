@@ -1,0 +1,4 @@
+{
+	"config": "ipsec",
+	"exec": "/sbin/service swanctl reload"
+}

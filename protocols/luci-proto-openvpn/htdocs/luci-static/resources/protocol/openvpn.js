@@ -11,6 +11,7 @@ const callGenKey = rpc.declare({
 	object: 'luci.openvpn',
 	method: 'generateKey',
 	params: { keytype: 'keytype', ifname: 'ifname', server_key: 'server_key', cl_meta: '' },
+	reject: true,
 });
 
 
@@ -18,6 +19,14 @@ const callGetSKeys = rpc.declare({
 	object: 'luci.openvpn',
 	method: 'getSKeys',
 	params: [ 'ifname' ],
+	reject: true,
+});
+
+const callPrepareProfile = rpc.declare({
+	object: 'luci.openvpn',
+	method: 'prepareProfile',
+	params: [ 'ifname' ],
+	reject: true,
 });
 
 
@@ -261,9 +270,8 @@ const openvpnOptions = [
 	},
 	{
 		tab: 'service',
-		type: form.DirectoryPicker,
+		type: form.Value,
 		name: 'chroot',
-		root_directory: '/var/run',
 		label: _('Chroot to directory after initialization'),
 		placeholder: '/var/run'
 	},
@@ -937,15 +945,13 @@ const openvpnOptions = [
 	},
 	{
 		tab: 'cryptography',
-		type: form.DirectoryPicker,
-		root_directory: '/etc',
+		type: form.Value,
 		name: 'capath',
 		label: _('CA path') + '²'
 	},
 	{
 		tab: 'cryptography',
-		type: form.FileUpload,
-		root_directory: '/etc',
+		type: form.Value,
 		name: 'askpass',
 		label: _('Get certificate password from file before we daemonize')
 	},
@@ -1030,8 +1036,7 @@ const openvpnOptions = [
 	},
 	{
 		tab: 'cryptography',
-		type: form.FileUpload,
-		root_directory: '/var/run/',
+		type: form.Value,
 		name: 'replay_persist',
 		label: _('Persist replay-protection state'),
 		placeholder: '/var/run/openvpn-replay-state'
@@ -1399,7 +1404,6 @@ const openvpnOptions = [
 		depends: { server: "", "!reverse": true },
 		type: form.DirectoryPicker,
 		root_directory: '/etc/openvpn',
-		directory_create: true,
 		name: 'client_config_dir',
 		label: _('Directory for custom client config files')
 	},
@@ -1681,12 +1685,18 @@ return network.registerProtocol('openvpn', {
 		kt.write = function(section_id, value) {};
 
 		sk = s.taboption('keygen', form.Value, '_skey', _('Server key'));
-		callGetSKeys(s.map.section).then(keys => {
-			if (keys.skeys) {
-				for (let key of keys.skeys)
-					sk.value(key);
-			}
-		});
+		sk.load = function(sid) {
+			this.keylist = [];
+			this.vallist = [];
+			return callGetSKeys(sid).then(keys => {
+				if (keys?.error || !Array.isArray(keys?.skeys))
+					throw new Error(keys?.error || _('Unable to list server keys.'));
+				keys.skeys.forEach(key => this.value(key));
+			}).catch(error => {
+				ui.addNotification(null, E('p', error.message), 'error');
+			}).then(() => this.super('load', [ sid ]));
+		};
+		sk.write = function() {};
 
 		clm = s.taboption('keygen', form.TextValue, '_cmeta', _('Client metadata'),
 			_('Freeform metadata to embed into the client key'));
@@ -1696,14 +1706,20 @@ return network.registerProtocol('openvpn', {
 		clm.monospace = true;
 		clm.rows = 10;
 		clm.wrap = 90;
+		clm.write = function() {};
 
 		o = s.taboption('keygen', form.Button, '_keygen', _('Generate'));
+		o.readonly = !L.hasViewPermission();
 		o.onclick = L.bind(function(ev, sid) {
+			if (!L.hasViewPermission())
+				return Promise.reject(new Error(_('Permission denied.')));
 			const ktype = kt.formvalue(sid);
 			const svk = sk.formvalue(sid);
 			const clmeta = clm.formvalue(sid);
 
-			callGenKey({ ifname: sid, keytype: ktype, server_key: svk ?? '', cl_meta: btoa(clmeta) }).then(result => {
+			return callGenKey({ ifname: sid, keytype: ktype, server_key: svk ?? '', cl_meta: btoa(clmeta) }).then(result => {
+				if (result.error || !result.path || !result.content)
+					throw new Error(result.error || _('Unable to generate key.'));
 				const path_output = krp.getUIElement(sid);
 				const cont_output = krc.getUIElement(sid);
 				path_output.setValue(result.path);
@@ -1712,6 +1728,8 @@ return network.registerProtocol('openvpn', {
 					const skv = sk.getUIElement(sid);
 					skv.setValue(result.filename);
 				}
+			}).catch(error => {
+				ui.addNotification(null, E('p', error.message), 'error');
 			});
 		}, this);
 
@@ -1731,22 +1749,34 @@ return network.registerProtocol('openvpn', {
 		krc.wrap = 90;
 		krc.write = function(sid, value) { return; };
 
-		o = s.taboption('file', form.Button, '_clear', _('Clear'));
-		o.onclick = L.bind(function(ev, sid) {
+		function clearConfig(sid) {
 			const config_name = `/etc/openvpn/${sid}/${sid}_config.cfg`;
+			return fs.remove(config_name).catch(err => {
+				if (err.name !== 'NotFoundError')
+					throw err;
+			}).then(() => {
+				uci.unset(ovconf.config, sid, 'config');
+			});
+		}
+
+		o = s.taboption('file', form.Button, '_clear', _('Clear'));
+		o.readonly = !L.hasViewPermission();
+		o.onclick = function(ev, sid) {
+			if (!L.hasViewPermission())
+				return Promise.reject(new Error(_('Permission denied.')));
 			let v = ovconf.getUIElement(sid);
 			// remove file, clear field, mark it changed and save
-			fs.remove(config_name).catch(() => {}).then(() => {
+			return clearConfig(sid).then(() => {
 				try {
 					v.setValue('');
 					if (v && v.node)
 						v.node.dispatchEvent(new Event('change', { bubbles: true }));
 				} catch (e) {}
-				uci.unset(this.config, sid, 'config');
+				ovconf.cfgvalue(sid, '');
 				if (s && s.map)
-					s.map.save(null, true);
+					return s.map.save(null, true);
 			});
-		}, this);
+		};
 
 		ovconf = s.taboption('file', form.TextValue, 'ovpn_config', _('Raw OVPN config'));
 		ovconf.rows = 20;
@@ -1828,33 +1858,37 @@ return network.registerProtocol('openvpn', {
 			} catch (e) { }
 		}
 
-		ovconf.cfgvalue = function(sid) {
+		ovconf.load = function(sid) {
 			attachDragDrop(sid);
-			const config_name = `/etc/openvpn/${sid}/${sid}_config.cfg`;
-			/* call unset if there is no on-disk config.cfg file for this profile */
-			return fs.read(config_name).then(readresult => {
-				attachDragDrop(sid);
-				if (readresult == null || readresult === '') {
-					uci.unset(this.config, sid, 'config');
+			const config_name = uci.get(this.config, sid, 'config') || `/etc/openvpn/${sid}/${sid}_config.cfg`;
+			return fs.read(config_name).then(content => {
+				// Match textarea.value so an unchanged Save does not rewrite the profile.
+				return content.replace(/\r\n?/g, '\n');
+			}).catch(err => {
+				if (err.name === 'NotFoundError')
 					return '';
-				}
-				uci.set(this.config, sid, 'config', config_name);
-				return readresult;
-			}).catch(() => {
-				attachDragDrop(sid);
-				uci.unset(this.config, sid, 'config');
-				return '';
+				if (err.name === 'NoDataError')
+					return fs.stat(config_name).then(stat => {
+						if (stat.type === 'file' && stat.size === 0)
+							return '';
+						throw err;
+					});
+				throw err;
 			});
 		};
 		ovconf.write = function(sid, value) {
 			const config_name = `/etc/openvpn/${sid}/${sid}_config.cfg`;
-			return fs.exec('/bin/mkdir', ['-p', `/etc/openvpn/${sid}/`]).then(() => {
+			return callPrepareProfile(sid).then(result => {
+				if (result.error || result.path !== `/etc/openvpn/${sid}`)
+					throw new Error(result.error || _('Unable to create the OpenVPN profile directory.'));
 				return fs.write(config_name, value);
 			}).then(() => {
-				try {
-					uci.set(this.config, sid, 'config', config_name);
-				} catch (err) {}
+				uci.set(this.config, sid, 'config', config_name);
 			});
+		};
+		ovconf.remove = function(sid) {
+			if (this.isActive(sid) && this.cfgvalue(sid))
+				return clearConfig(sid);
 		};
 		ovconf.rmempty = true;
 	},
