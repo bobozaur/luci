@@ -760,7 +760,7 @@ return view.extend({
 				_('A value of 0 disables threshold.')
 			);
 			o.optional = true;
-			o.placeholder = 0;
+			o.placeholder = 5;
 			o.datatype = 'uinteger';		
 		}
 
