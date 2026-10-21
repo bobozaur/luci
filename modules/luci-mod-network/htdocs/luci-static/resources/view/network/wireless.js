@@ -2381,7 +2381,16 @@ return view.extend({
 		};
 
 		s.handleScanRefresh = function(radioDev, scanCache, table, stop) {
+			if (!table.isConnected)
+				return Promise.resolve();
+
+			const pollFn = this.pollFn;
+			stop.setAttribute('data-pending', '');
+
 			return radioDev.getScanList().then(L.bind(function(results) {
+				if (!table.isConnected)
+					return;
+
 				const rows = [];
 
 				for (let r of results)
@@ -2433,11 +2442,23 @@ return view.extend({
 				});
 
 				cbi_update_table(table, rows);
+			}, this)).catch(error => {
+				if (!table.isConnected)
+					return;
 
+				poll.remove(pollFn);
+				cbi_update_table(table, [], E('em', {}, _('Wireless scan failed: %s').format(error.message)));
+				stop.firstChild.data = _('Start refresh');
+				stop.setAttribute('data-state', 'start');
+			}).finally(() => {
+				if (!table.isConnected)
+					return;
+
+				stop.removeAttribute('data-pending');
 				stop.disabled = false;
 				stop.style.display = '';
 				stop.classList.remove('spinning');
-			}, this));
+			});
 		};
 
 		s.handleScanStartStop = function(ev) {
@@ -2448,6 +2469,7 @@ return view.extend({
 					poll.remove(this.pollFn);
 				btn.firstChild.data = _('Start refresh');
 				btn.setAttribute('data-state', 'start');
+				btn.disabled = btn.hasAttribute('data-pending');
 			}
 			else {
 				poll.add(this.pollFn);

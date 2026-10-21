@@ -81,6 +81,7 @@ const callIwinfoScan = rpc.declare({
 	method: 'scan',
 	params: [ 'device' ],
 	nobatch: true,
+	timeout: 60000,
 	expect: { results: [] }
 });
 

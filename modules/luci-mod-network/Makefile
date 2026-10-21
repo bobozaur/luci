@@ -7,7 +7,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_VERSION=$(PKG_SRC_VERSION)
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 LUCI_TITLE:=LuCI Network Administration
 LUCI_DEPENDS:=+luci-base +rpcd-mod-iwinfo +luci-lib-uqr
