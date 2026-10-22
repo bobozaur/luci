@@ -1215,6 +1215,9 @@ return baseclass.extend({
 			o.value('3', _('Low'));
 		}
 
+		o = this.replaceOption(s, 'devadvanced', cbiFlagTristate, 'gro', _('Generic receive offload (GRO)'), _('Combine received packets before processing. Performance depends on the hardware and traffic. Configure bridge ports individually.'));
+		o.sysfs_default = null;
+
 		o = this.replaceOption(s, 'devadvanced', cbiFlagTristate, 'promisc', _('Enable promiscuous mode'));
 		o.sysfs_default = (dev && dev.dev && dev.dev.flags) ? dev.dev.flags.promisc : null;
 

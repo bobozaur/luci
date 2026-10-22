@@ -7,10 +7,11 @@
 include $(TOPDIR)/rules.mk
 
 PKG_VERSION=$(PKG_SRC_VERSION)
-PKG_RELEASE:=4
+PKG_RELEASE:=6
 
 LUCI_TITLE:=LuCI Network Administration
-LUCI_DEPENDS:=+luci-base +rpcd-mod-iwinfo +luci-lib-uqr
+LUCI_EXTRA_DEPENDS:=netifd (>=2026.09.11~06d06c86-r8)
+LUCI_DEPENDS:=+netifd +luci-base +rpcd-mod-iwinfo +luci-lib-uqr
 
 PKG_LICENSE:=Apache-2.0
 
