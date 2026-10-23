@@ -21,12 +21,6 @@
 				"/usr/libexec/luci-mwan3 diag routes *": [
 					"exec"
 				],
-				"/usr/sbin/mwan3 ifup *": [
-					"exec"
-				],
-				"/usr/sbin/mwan3 ifdown *": [
-					"exec"
-				],
 				"/usr/sbin/mwan3 internal ipv4": [
 					"exec"
 				]
@@ -34,6 +28,9 @@
 			"ubus": {
 				"mwan3": [
 					"status"
+				],
+				"file": [
+					"exec"
 				]
 			},
 			"uci": [
@@ -44,6 +41,14 @@
 		"write": {
 			"ubus": {
 				"file": [
+					"exec"
+				]
+			},
+			"file": {
+				"/usr/sbin/mwan3 ifup *": [
+					"exec"
+				],
+				"/usr/sbin/mwan3 ifdown *": [
 					"exec"
 				]
 			}
@@ -58,11 +63,20 @@
 			"file": {
 				"/usr/libexec/luci-mwan3 ipset dump": [
 					"exec"
+				],
+				"/etc/mwan3.user": [
+					"list",
+					"read"
 				]
 			},
 			"ubus": {
 				"mwan3": [
 					"status"
+				],
+				"file": [
+					"read",
+					"stat",
+					"exec"
 				]
 			},
 			"uci": [
@@ -78,7 +92,12 @@
 			},
 			"uci": [
 				"mwan3"
-			]
+			],
+			"ubus": {
+				"file": [
+					"write"
+				]
+			}
 		}
 	}
 }

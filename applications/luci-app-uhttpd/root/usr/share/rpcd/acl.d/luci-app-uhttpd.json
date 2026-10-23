@@ -4,15 +4,25 @@
 		"read": {
 			"uci": ["uhttpd"],
 			"file": {
-				"/etc/init.d/uhttpd restart": ["exec"]
+				"/": ["list"],
+				"/*": ["list"]
+			},
+			"ubus": {
+				"file": ["list", "stat"],
+				"uci": ["changes", "get"]
 			}
 		},
 		"write": {
 			"uci": ["uhttpd"],
+			"cgi-io": ["upload"],
 			"file": {
 				"/etc/luci-uploads/*": ["write"],
 				"/etc/uhttpd.key": ["write"],
-				"/etc/uhttpd.crt": ["write"]
+				"/etc/uhttpd.crt": ["write"],
+				"/bin/ubus call service event {\"type\":\"config.change\",\"data\":{\"package\":\"uhttpd\"}}": ["exec"]
+			},
+			"ubus": {
+				"file": ["exec", "remove"]
 			}
 		}
 	}
