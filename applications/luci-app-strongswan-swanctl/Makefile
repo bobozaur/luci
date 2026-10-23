@@ -5,12 +5,15 @@
 
 include $(TOPDIR)/rules.mk
 
+PKG_VERSION=$(PKG_SRC_VERSION)
+PKG_RELEASE:=2
+
 PKG_LICENSE:=GPL-2.0-or-later
 PKG_MAINTAINER:=Nicholas Smith <nicholas@nbembedded.com>, Lukas Voegl <lvoegl@tdt.de>
 
 LUCI_TITLE:=LuCI support for strongSwan via swanctl
 LUCI_DESCRIPTION:=Status and configuration for strongSwan based on swanctl
-LUCI_DEPENDS:=+strongswan-swanctl +swanmon
+LUCI_DEPENDS:=+luci-base +strongswan-swanctl +swanmon
 
 include ../../luci.mk
 
