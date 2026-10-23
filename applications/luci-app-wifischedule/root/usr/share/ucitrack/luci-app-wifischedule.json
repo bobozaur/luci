@@ -1,0 +1,4 @@
+{
+	"config": "wifi_schedule",
+	"exec": "/usr/bin/wifi_schedule.sh cron"
+}

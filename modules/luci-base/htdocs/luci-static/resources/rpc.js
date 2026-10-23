@@ -18,7 +18,7 @@ const rpcInterceptorFns = [];
  */
 return baseclass.extend(/** @lends LuCI.rpc.prototype */ {
 	/* privates */
-	call(req, cb, nobatch) {
+	call(req, cb, nobatch, timeout) {
 		let q = '';
 
 		if (Array.isArray(req)) {
@@ -35,8 +35,8 @@ return baseclass.extend(/** @lends LuCI.rpc.prototype */ {
 		}
 
 		return request.post(rpcBaseURL + q, req, {
-			timeout: (L.env.rpctimeout ?? 20) * 1000,
-			nobatch,
+			timeout: timeout ?? (L.env.rpctimeout ?? 20) * 1000,
+			nobatch: nobatch || timeout != null,
 			credentials: true
 		}).then(cb, cb);
 	},
@@ -230,6 +230,10 @@ return baseclass.extend(/** @lends LuCI.rpc.prototype */ {
 	 * If set to `true`, non-zero ubus call status codes are treated as fatal
 	 * error and lead to the rejection of the call promise. The default
 	 * behaviour is to resolve with the call return code value instead.
+	 *
+	 * @property {number} [timeout]
+	 * Specifies the request timeout in milliseconds. Calls with an explicit
+	 * timeout are not batched, so other calls cannot change their deadline.
 	 */
 
 	/**
@@ -346,7 +350,7 @@ return baseclass.extend(/** @lends LuCI.rpc.prototype */ {
 				};
 
 				/* call rpc */
-				rpc.call(msg, rpc.parseCallReply.bind(rpc, req), options.nobatch);
+				rpc.call(msg, rpc.parseCallReply.bind(rpc, req), options.nobatch, options.timeout);
 			});
 		}, this, this, options);
 	},
