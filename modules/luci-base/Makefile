@@ -8,7 +8,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-base
 PKG_VERSION=$(PKG_SRC_VERSION)
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKG_BUILD_FLAGS:=no-lto
 
 LUCI_TYPE:=mod
