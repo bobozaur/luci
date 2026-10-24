@@ -4169,8 +4169,8 @@ WifiNetwork = baseclass.extend(/** @lends LuCI.network.WifiNetwork.prototype */ 
 	 * @property {boolean} is_vht
 	 * Specifies whether this rate is an VHT (IEEE 802.11ac) rate.
 	 *
-	 * @property {number} mhz
-	 * The channel width in MHz used for the transmission.
+	 * @property {number} [mhz]
+	 * The channel width in MHz, when reported by the backend.
 	 *
 	 * @property {number} rate
 	 * The bitrate in bit/s of the transmission.
