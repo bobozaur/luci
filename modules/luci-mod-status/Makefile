@@ -8,8 +8,9 @@ include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=LuCI Status Pages
 LUCI_DEPENDS:=+luci-base +libiwinfo +rpcd-mod-iwinfo
+LUCI_EXTRA_DEPENDS:=rpcd-mod-iwinfo (>=2026.10.04~d99f703e-r6)
 
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 PKG_BUILD_DEPENDS:=iwinfo
 PKG_LICENSE:=Apache-2.0
 
